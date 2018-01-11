@@ -206,6 +206,11 @@ class JobExecution(Base):
         return result
 
     @classmethod
+    def list_completed_jobs(cls):
+        return cls.query.filter(cls.running_status != SpiderStatus.PENDING,
+                                cls.running_status != SpiderStatus.RUNNING).all()
+
+    @classmethod
     def list_run_stats_by_hours(cls, project_id):
         result = {}
         hour_keys = []
