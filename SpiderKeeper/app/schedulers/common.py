@@ -1,37 +1,85 @@
-import threading
 import time
+import requests
 
 from SpiderKeeper.app import scheduler, app, agent, db
-from SpiderKeeper.app.spider.model import Project, JobInstance, SpiderInstance
+from SpiderKeeper.app.spider.model import Project, JobInstance, SpiderInstance, JobExecution
 
 
 def sync_job_execution_status_job():
-    '''
+    """
     sync job execution running status
     :return:
-    '''
+    """
     for project in Project.query.all():
         agent.sync_job_status(project)
     app.logger.debug('[sync_job_execution_status]')
 
 
 def sync_spiders():
-    '''
+    """
     sync spiders
     :return:
-    '''
+    """
     for project in Project.query.all():
         spider_instance_list = agent.get_spider_list(project)
         SpiderInstance.update_spider_instances(project.id, spider_instance_list)
     app.logger.debug('[sync_spiders]')
 
 
-def run_spider_job(job_instance_id):
-    '''
-    run spider by scheduler
-    :param job_instance:
+def clear_execution_jobs():
+    """
+    clear_execution_jobs
+    find compeleted JobExecution
+    check if it still existed on scrapyd servers.
+
     :return:
-    '''
+    """
+    complete_jobs = JobExecution.list_completed_jobs()
+    for je in complete_jobs:
+        clear_jobexecution(je)
+
+
+def clear_jobexecution(job_execution):
+    """
+    clear_jobexecution
+    check JobExecution still existed on scrapyd servers
+    delete it if didn't existed anymore.
+
+    :param job_execution:
+    :return:
+    """
+    job_instance = JobInstance.find_job_instance_by_id(job_execution.job_instance_id)
+    project = Project.find_project_by_id(job_instance.project_id)
+    if not check_job_existed(running_on=job_execution.running_on,
+                             project_name=project.project_name,
+                             spider_name=job_instance.spider_name,
+                             job_id=job_execution.service_job_execution_id):
+        db.session.delete(job_execution)
+        db.session.commit()
+
+
+def check_job_existed(running_on, project_name, spider_name, job_id):
+    """
+    check_job_existed
+    check JobExecution existed or not by request the log file.
+
+    :param running_on:
+    :param project_name:
+    :param spider_name:
+    :param job_id:
+    :return:
+    """
+    log_url = "%s/logs/%s/%s/%s.log" % (running_on, project_name, spider_name, job_id)
+    resp = requests.head(log_url)
+    return False if resp.status_code == 404 else True
+
+
+def run_spider_job(job_instance_id):
+    """
+    run spider by scheduler
+    :param job_instance_id:
+    :return:
+    """
     try:
         job_instance = JobInstance.find_job_instance_by_id(job_instance_id)
         agent.start_spider(job_instance)
@@ -42,10 +90,10 @@ def run_spider_job(job_instance_id):
 
 
 def reload_runnable_spider_job_execution():
-    '''
+    """
     add periodic job to scheduler
     :return:
-    '''
+    """
     running_job_ids = set([job.id for job in scheduler.get_jobs()])
     app.logger.debug('[running_job_ids] %s' % ','.join(running_job_ids))
     available_job_ids = set()

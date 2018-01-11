@@ -44,6 +44,7 @@ def teardown_request(exception):
         db.session.remove()
     db.session.remove()
 
+
 # Define apscheduler
 scheduler = BackgroundScheduler()
 
@@ -106,11 +107,14 @@ app.register_blueprint(api_spider_bp)
 
 # start sync job status scheduler
 from SpiderKeeper.app.schedulers.common import sync_job_execution_status_job, sync_spiders, \
-    reload_runnable_spider_job_execution
+    reload_runnable_spider_job_execution, clear_execution_jobs
 
 scheduler.add_job(sync_job_execution_status_job, 'interval', seconds=5, id='sys_sync_status')
 scheduler.add_job(sync_spiders, 'interval', seconds=10, id='sys_sync_spiders')
 scheduler.add_job(reload_runnable_spider_job_execution, 'interval', seconds=30, id='sys_reload_job')
+if app.config.get('CLEAR_HISTORY_JOB', True):
+    print('configed')
+    scheduler.add_job(clear_execution_jobs, 'interval', seconds=50, id='sys_clearhistory_job')
 
 
 def start_scheduler():

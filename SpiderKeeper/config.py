@@ -35,6 +35,9 @@ LOG_LEVEL = 'INFO'
 SERVER_TYPE = 'scrapyd'
 SERVERS = ['http://localhost:6800']
 
+# clear history executed job records
+CLEAR_HISTORY_JOB = False
+
 # basic auth
 NO_AUTH = False
 BASIC_AUTH_USERNAME = 'admin'
